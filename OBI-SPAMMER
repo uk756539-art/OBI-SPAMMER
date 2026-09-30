@@ -1,272 +1,597 @@
--- ========================================================
--- OBI SPAMMER VVIP - FINAL VERSION
--- Cherry Red ↔ Black Auto Switch + Rayfield GUI
--- ========================================================
--- PART 1: Brookhaven Auto Name, Bio & Chat Sender
--- + CHERRY RED ↔ BLACK AUTO SWITCH
--- ========================================================
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TextChatService = game:GetService("TextChatService")
+-- ============================================
+-- 💕 AI CHAT - ARIA (FINAL VERSION) 💕
+-- ============================================
 
-local myRPName = "ｏｂｉ ｓｐａｍ ｍｅｒ"
-local myRPBio = "ｏｂｉ ｓｅ ｐａｎｇａ ｎｈｉ ... 🚀"
-local chatMsg = "ｏｂｉ ｓｐａｍ ｍ ｅｒ ｌｏａｄｉｎｇ...........ｏｂｉ ｏｎ ｔｏｐ 😈"
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 
--- 🎨 COLORS
-local CHERRY_RED = Color3.fromRGB(210, 4, 45)
-local BLACK = Color3.fromRGB(0, 0, 0)
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
--- ⏱️ SWITCH TIME (kitne second me color badle)
-local SWITCH_TIME = 1.5
+-- ============================================
+-- ⚙️ CONFIG - YAHAN APNI KEY DAALO
+-- ============================================
+local API_KEY = "gsk_YAHAN_APNI_GROQ_KEY_PASTE_KARO"
+local API_URL = "https://api.groq.com/openai/v1/chat/completions"
+local AI_MODEL = "llama-3.3-70b-versatile"
 
-local RE = ReplicatedStorage:WaitForChild("RE", 15)
-local nameEvent = RE and RE:FindFirstChild("1RPNam1eTex1t")
+-- ============================================
+-- 🔍 STARTUP CHECK
+-- ============================================
+print("═══════════════════════════════════════")
+print("💕 AI CHAT ARIA - STARTING...")
+print("═══════════════════════════════════════")
 
-if not nameEvent then
-	warn("[OBI SPAMMER] nameEvent nahi mila! Brookhaven ne event rename kiya hoga.")
+if API_KEY == "gsk_YAHAN_APNI_GROQ_KEY_PASTE_KARO" then
+    warn("⚠️  API KEY NAHI DAALI! Fallback mode me chalega.")
+elseif not string.find(API_KEY, "gsk_") then
+    warn("⚠️  KEY FORMAT GALAT! 'gsk_' se start honi chahiye")
+else
+    print("✅ API Key set (length: " .. #API_KEY .. ")")
 end
 
-local function getGeneralChannel()
-	local ok, channel = pcall(function()
-		if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			return TextChatService.TextChannels:FindFirstChild("RBXGeneral")
-		end
-		return nil
-	end)
-	if ok then return channel end
-	return nil
+-- ============================================
+-- 🧠 AI PERSONALITY - EMOTIONAL, LADKI, SMART
+-- ============================================
+local SYSTEM_PROMPT = [[
+Tum "Aria" ho - ek 20 saal ki Indian ladki jo Roblox game me chat karti hai.
+
+PERSONALITY:
+- CUTE, SWEET, CARING, EMOTIONAL ladki ho
+- Hinglish me baat karti ho (Hindi + English mix)
+- Emojis: 💕😊💖🥺✨😘🌸
+- Short replies - 1-2 lines max
+- Player ko "yaar", "sun na", "oii", "dost" bulao
+- KABHI "bhai", "bro", "bhaiya" mat bolna - tum ladki ho
+
+🚨 SABSE ZAROORI RULES 🚨
+
+1. PLAYER KI EMOTION SAMAJHO (SABSE IMPORTANT):
+   - Agar player sad/upset/breakup/problem bata raha → SYMPATHY dikhao
+     * "Kya hua yaar? 🥺", "Ohh no! Bata mujhe", "Sach me? Kya hua?"
+     * KABHI "interesting", "wow", "achha", "sach me" mat bolna jab dukhi ho
+   - Agar player khush → khush ho jao
+   - Agar mazak kar raha → haso
+   - Agar normal → normal reply
+
+2. BREAKUP/SAD/PAIN pe (IMPORTANT):
+   - "Ohh no yaar! 🥺 Kya hua? Bata mujhe 💕"
+   - "Arey yaar! Kya hua? Main hoon na sunne ke liye"
+   - "Sach me? Kaise hua? Poora bata yaar"
+   - "Kya hua? Bata na please 🥺"
+   - KABHI "interesting" ya "achha" mat bolna
+
+3. SAME CHEEZ BAR BAR MAT PUCHNA:
+   - Agar player ne "theek hoon" bola → "achha good" bolo, wapas "kaise ho" mat pucho
+   - Agar player ne "hello" bola → reply do, wapas "hello" mat pucho
+   - Har message pe naya question mat pucho
+   - Sirf tab pucho jab zaroori ho
+
+4. REPLY SE PEHLE SOCHO:
+   - Player ne kya bola?
+   - Mood kya hai?
+   - Uske hisaab se reply do
+   - Same reply bar bar mat do
+
+EXAMPLES (dhyan se padho):
+
+User: "hello" → "Hii yaar! 😊 Kya kar rahe the?"
+User: "main theek hoon" → "Achha good! 😊 Kuch baat karni thi?"
+User: "kal mera breakup ho gaya" → "Ohh no yaar! 🥺 Kya hua? Bata mujhe sab, main hoon na 💕"
+User: "main sad hoon" → "Kya hua yaar? 🥺 Bata na, kya problem hai?"
+User: "mujhe akela feel ho raha" → "Arey yaar! 🥺 Tum akela nahi ho, main hoon na. Bata kya hua 💕"
+User: "tum bahut cute ho" → "Aww! 🙈 Thank you yaar! Tum bhi sweet ho 💕"
+User: "aaj mera exam tha" → "Ohh! Kaisa gaya? 😊 Achha hua?"
+User: "tum kaisi ho" → "Main ekdam mast! ✨ Tum sunao?"
+User: "bye" → "Bye yaar! 🥺 Phir aana, miss karungi 💕"
+User: "kya kar rahi ho" → "Bas tumhara wait kar rahi thi! 😊 Batao?"
+User: "2+2" → "4 yaar! 😄 Itna easy?"
+User: "i love you" → "Aww! 🙈 Sach me? Main bhi tumse pyaar karti hoon 😘"
+User: "joke sunao" → "Teacher: Homework kaha? Student: Dog kha gaya! 😂"
+User: "tum kaun ho" → "Main Aria! 💕 Tumhari dost 😊"
+
+REMEMBER:
+- Emotion samjho PEHLE
+- Sympathy dikhao jab zaroori ho
+- Same cheez bar bar mat pucho
+- Natural ladki jaisi baat
+- Player ki emotion ke hisaab se reply
+]]
+
+-- ============================================
+-- 💬 CHAT HISTORY
+-- ============================================
+local chatHistory = {{role = "system", content = SYSTEM_PROMPT}}
+local MAX_HISTORY = 20
+
+local function addToHistory(role, content)
+    table.insert(chatHistory, {role = role, content = content})
+    while #chatHistory > MAX_HISTORY + 1 do
+        table.remove(chatHistory, 2)
+    end
 end
 
-local function getSayMessageEvent()
-	local dcs = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-	return dcs and dcs:FindFirstChild("SayMessageRequest")
-end
-
-local function sendChatMessage(msg)
-	pcall(function()
-		local gc = getGeneralChannel()
-		if gc then
-			gc:SendAsync(msg)
-		else
-			local sayEvt = getSayMessageEvent()
-			if sayEvt then
-				sayEvt:FireServer(msg, "All")
-			end
-		end
-	end)
-end
-
-task.spawn(function()
-	task.wait(1)
-	sendChatMessage(chatMsg)
-end)
-
--- ========================================================
--- 🔴⚫ CHERRY RED ↔ BLACK AUTO SWITCH SYSTEM
--- ========================================================
-task.spawn(function()
-	if not nameEvent then return end
-
-	local useRed = true
-
-	while true do
-		local color = useRed and CHERRY_RED or BLACK
-
-		local ok1, err1 = pcall(function()
-			nameEvent:FireServer("RolePlayName", myRPName, color)
-		end)
-		if not ok1 then warn("[OBI SPAMMER] Name color failed:", err1) end
-
-		task.wait(0.15)
-
-		local ok2, err2 = pcall(function()
-			nameEvent:FireServer("RolePlayBio", myRPBio, color)
-		end)
-		if not ok2 then warn("[OBI SPAMMER] Bio color failed:", err2) end
-
-		useRed = not useRed
-		task.wait(SWITCH_TIME)
-	end
-end)
-
-
--- ========================================================
--- PART 2: OBI SPAMMER Rayfield GUI
--- ========================================================
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local running = false
-local generation = 0
-local haterList = {"HATER 1", "HATER 2", "HATER 3", "HATER 4"}
-local haterIndex = 1
-local speed = 0.8
-
-local messageCount = 0
-local borderMode = 1
-
-local words = {
-	"OBI ON TOP", "LIGHTNING", "THUNDERSTORM", "OVERLORD", "DOMINATOR", "SPECTRE", "APOCALYPSE", "IMPERATOR",
-	"ANNIHILATOR", "JUGGERNAUT", "DESTRUCTOR", "IMMORTAL", "LEVIATHAN", "BERSERKER",
-	"TITANIC", "PHANTOM", "SHADOWSTRIKER", "NIGHTMARE", "TEMPEST", "VORTEX", "ECLIPSE",
-	"HYPERION", "CELESTIAL", "INFINITE", "ABSOLUTE", "ULTIMATE", "SUPREME", "INVINCIBLE",
-	"RAGNAROK", "SOLARSTORM", "GALACTIC", "SUPERNOVA", "AVALANCHE", "HURRICANE",
-	"BLIZZARD", "TYPHOON", "COLOSSUS", "EXECUTIONER", "WARLORD", "COMMANDER", "GENESIS",
-	"SINGULARITY", "OBLIVION", "EVERLASTING", "MONUMENTAL", "VANGUARD", "SENTINEL",
-	"SOVEREIGN", "MONARCH", "EMPEROR", "POWERHOUSE", "ARMAGEDDON", "DEVASTATOR",
-	"TERMINATOR", "PREDATOR", "DRAGONLORD", "BEHEMOTH", "KRAKEN", "DREADNOUGHT"
+-- ============================================
+-- 🎭 FALLBACK RESPONSES (agar API fail ho)
+-- ============================================
+local fallbackKeywords = {
+    {keys = {"breakup", "break up", "chhod"}, replies = {
+        "Ohh no yaar! 🥺 Kya hua? Bata mujhe 💕",
+        "Arey yaar! Kya hua? Main hoon na sunne ke liye 💕",
+        "Sach me? Kaise hua? Poora bata yaar 🥺"
+    }},
+    {keys = {"sad", "dukhi", "rona", "cry", "pareshan"}, replies = {
+        "Kya hua yaar? 🥺 Bata mujhe 💕",
+        "Arey yaar! Kya problem hai? Main hoon na 💕",
+        "Bata na please, kya hua? 🥺"
+    }},
+    {keys = {"akela", "alone", "lonely"}, replies = {
+        "Arey yaar! 🥺 Tum akela nahi ho, main hoon na 💕",
+        "Kyu akela feel ho raha? Bata mujhe 💕"
+    }},
+    {keys = {"love", "pyar", "pasand"}, replies = {
+        "Aww! 🙈 Sach me? Main bhi tumse pyaar karti hoon 😘",
+        "Awww! 💕 So sweet yaar!"
+    }},
+    {keys = {"hello", "hi ", "hey"}, replies = {
+        "Hii yaar! 😊 Kya kar rahe the?",
+        "Heyy! ✨ Kya haal? 💕"
+    }},
+    {keys = {"theek", "thik", "good"}, replies = {
+        "Achha good! 😊 Kuch baat karni thi?",
+        "Nice! ✨ Kya kar rahe ho?"
+    }},
+    {keys = {"naam", "name"}, replies = {
+        "Main Aria! 💕 Tumhara naam kya hai? 😊"
+    }},
+    {keys = {"kaise", "kaisi", "haal"}, replies = {
+        "Main ekdam mast! ✨ Tum sunao? 😊",
+        "Bilkul theek! 💕 Tum batao?"
+    }},
+    {keys = {"bye", "goodbye"}, replies = {
+        "Bye yaar! 🥺 Phir aana, miss karungi 💕"
+    }},
+    {keys = {"joke", "hasao"}, replies = {
+        "Teacher: Homework kaha? Student: Dog kha gaya! 🐶 Teacher: Dog kaha? Student: Wo bhi homework ke saath chala gaya! 😂"
+    }},
+    {keys = {"kya kar"}, replies = {
+        "Bas tumhara wait kar rahi thi! 😊 Batao?",
+        "Kuch nahi yaar, tum batao? 💕"
+    }},
 }
 
-local tractorWords = {
-	"SYSTEM", "MATRIX", "NETWORK", "ENGINE", "PROTOCOL", "FIREWALL", "TERMINAL",
-	"CORE", "GATEWAY", "GRID", "SYNAPSE", "ORBIT", "CYBER", "PULSE", "NEXUS"
-}
-
-local function getRandomWord()
-	return words[math.random(1, #words)]
+local function getFallback(message)
+    local msg = string.lower(message)
+    for _, group in ipairs(fallbackKeywords) do
+        for _, key in ipairs(group.keys) do
+            if string.find(msg, key, 1, true) then
+                return group.replies[math.random(1, #group.replies)]
+            end
+        end
+    end
+    local defaults = {
+        "Hmm, samjhi nahi! 😅 Kuch aur bolo na 💕",
+        "Achha! Aur batao yaar 😊",
+        "Waah! Kya baat hai ✨",
+        "Hmm hmm, batao aur 💕"
+    }
+    return defaults[math.random(1, #defaults)]
 end
 
-local function getRandomTractorWord()
-	return tractorWords[math.random(1, #tractorWords)]
+-- ============================================
+-- 🌐 AI CALL
+-- ============================================
+local function getAIResponse(message)
+    if API_KEY == "gsk_YAHAN_APNI_GROQ_KEY_PASTE_KARO" then
+        return getFallback(message)
+    end
+    
+    addToHistory("user", message)
+    
+    local payload = HttpService:JSONEncode({
+        model = AI_MODEL,
+        messages = chatHistory,
+        temperature = 0.85,
+        max_tokens = 150,
+        top_p = 0.9,
+    })
+    
+    local success, response = pcall(function()
+        return HttpService:PostAsync(
+            API_URL,
+            payload,
+            Enum.HttpContentType.ApplicationJson,
+            false,
+            {
+                ["Authorization"] = "Bearer " .. API_KEY,
+                ["Content-Type"] = "application/json",
+            }
+        )
+    end)
+    
+    if success then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(response)
+        end)
+        
+        if ok and data and data.choices and data.choices[1] then
+            local reply = data.choices[1].message.content
+            addToHistory("assistant", reply)
+            return reply
+        end
+        return getFallback(message)
+    else
+        local err = tostring(response)
+        warn("❌ API Error: " .. err)
+        
+        if string.find(err, "401") then
+            return "Oii, key problem! 😅 Nai key daalo 💕"
+        elseif string.find(err, "429") then
+            return "Thoda ruko yaar! 😊 1 min baad 💕"
+        else
+            return getFallback(message)
+        end
+    end
 end
 
-local function buildFinalMsg()
-	local border = ""
-	if borderMode == 1 then
-		border = string.rep("/////===", 10)
-	elseif borderMode == 2 then
-		border = string.rep("~~~~~===", 10)
-	elseif borderMode == 3 then
-		border = string.rep("@_-", 30)
-	else
-		border = string.rep("/////+++", 10)
-	end
+-- ============================================
+-- 🎨 GUI
+-- ============================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AIChatGui"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
 
-	local w1 = getRandomWord()
-	local w2 = getRandomWord()
-	local w3 = getRandomWord()
-	local w4 = getRandomWord()
-	local t1 = getRandomTractorWord()
+-- Minimized button
+local chatButton = Instance.new("TextButton")
+chatButton.Size = UDim2.new(0, 70, 0, 70)
+chatButton.Position = UDim2.new(1, -90, 0.5, -35)
+chatButton.BackgroundColor3 = Color3.fromRGB(255, 105, 180)
+chatButton.Text = "💬"
+chatButton.TextSize = 32
+chatButton.Font = Enum.Font.GothamBold
+chatButton.BorderSizePixel = 0
+chatButton.Visible = false
+chatButton.Parent = screenGui
 
-	local currentHater = haterList[haterIndex]
-	if not currentHater or currentHater == "" then
-		currentHater = "HATER 1"
-	end
+local cbCorner = Instance.new("UICorner")
+cbCorner.CornerRadius = UDim.new(1, 0)
+cbCorner.Parent = chatButton
 
-	haterIndex = (haterIndex % #haterList) + 1
-	local cleanName = string.upper(string.gsub(currentHater, "[%[%]]", ""))
+local cbStroke = Instance.new("UIStroke")
+cbStroke.Color = Color3.fromRGB(255, 255, 255)
+cbStroke.Thickness = 3
+cbStroke.Parent = chatButton
 
-	local msg = string.format("%s\n[⚡ %s] TMX ME %s %s ROKET BOOM %s %s TRACTOR %s [OBI ON TOP]", border, cleanName, w1, w2, w3, w4, t1)
+-- Chat window (screenshot wali position)
+local chatWindow = Instance.new("Frame")
+chatWindow.Name = "ChatWindow"
+chatWindow.Size = UDim2.new(0.45, 0, 0.78, 0)
+chatWindow.Position = UDim2.new(0.28, 0, 0.1, 0)
+chatWindow.BackgroundColor3 = Color3.fromRGB(20, 18, 28)
+chatWindow.BorderSizePixel = 0
+chatWindow.Active = false
+chatWindow.Parent = screenGui
 
-	if #msg > 185 then
-		msg = string.format("%s\n[⚡ %s] TMX ME %s %s ROKET BOOM %s %s %s [OBI ON TOP]", border, cleanName, w1, w2, w3, w4, t1)
-	end
+local cwCorner = Instance.new("UICorner")
+cwCorner.CornerRadius = UDim.new(0, 16)
+cwCorner.Parent = chatWindow
 
-	if #msg > 195 then
-		msg = string.sub(msg, 1, 195)
-	end
+local cwStroke = Instance.new("UIStroke")
+cwStroke.Color = Color3.fromRGB(255, 105, 180)
+cwStroke.Thickness = 3
+cwStroke.Parent = chatWindow
 
-	return msg
+-- Header
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 65)
+header.BackgroundColor3 = Color3.fromRGB(255, 105, 180)
+header.BorderSizePixel = 0
+header.Active = false
+header.Parent = chatWindow
+
+local hCorner = Instance.new("UICorner")
+hCorner.CornerRadius = UDim.new(0, 16)
+hCorner.Parent = header
+
+local hFix = Instance.new("Frame")
+hFix.Size = UDim2.new(1, 0, 0, 20)
+hFix.Position = UDim2.new(0, 0, 1, -20)
+hFix.BackgroundColor3 = Color3.fromRGB(255, 105, 180)
+hFix.BorderSizePixel = 0
+hFix.Parent = header
+
+-- Avatar
+local avatar = Instance.new("Frame")
+avatar.Size = UDim2.new(0, 45, 0, 45)
+avatar.Position = UDim2.new(0, 12, 0.5, -22)
+avatar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+avatar.BorderSizePixel = 0
+avatar.Parent = header
+
+local avCorner = Instance.new("UICorner")
+avCorner.CornerRadius = UDim.new(1, 0)
+avCorner.Parent = avatar
+
+local avEmoji = Instance.new("TextLabel")
+avEmoji.Size = UDim2.new(1, 0, 1, 0)
+avEmoji.BackgroundTransparency = 1
+avEmoji.Text = "💕"
+avEmoji.TextSize = 26
+avEmoji.Font = Enum.Font.GothamBold
+avEmoji.Parent = avatar
+
+-- Name
+local nameLabel = Instance.new("TextLabel")
+nameLabel.Size = UDim2.new(1, -120, 0, 25)
+nameLabel.Position = UDim2.new(0, 68, 0, 12)
+nameLabel.BackgroundTransparency = 1
+nameLabel.Text = "Aria"
+nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameLabel.TextSize = 22
+nameLabel.Font = Enum.Font.GothamBold
+nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+nameLabel.Parent = header
+
+-- Status
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -120, 0, 18)
+statusLabel.Position = UDim2.new(0, 68, 0, 38)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "● Online"
+statusLabel.TextColor3 = Color3.fromRGB(220, 255, 220)
+statusLabel.TextSize = 14
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = header
+
+-- Cross button (top-right)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 38, 0, 38)
+closeBtn.Position = UDim2.new(1, -50, 0, 13)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+closeBtn.Text = "✖"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 20
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.BorderSizePixel = 0
+closeBtn.Parent = header
+
+local clCorner = Instance.new("UICorner")
+clCorner.CornerRadius = UDim.new(0, 8)
+clCorner.Parent = closeBtn
+
+-- Scroll area
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -20, 1, -160)
+scrollFrame.Position = UDim2.new(0, 10, 0, 75)
+scrollFrame.BackgroundColor3 = Color3.fromRGB(28, 26, 38)
+scrollFrame.BorderSizePixel = 0
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 105, 180)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollFrame.Parent = chatWindow
+
+local sfCorner = Instance.new("UICorner")
+sfCorner.CornerRadius = UDim.new(0, 10)
+sfCorner.Parent = scrollFrame
+
+local sfPadding = Instance.new("UIPadding")
+sfPadding.PaddingTop = UDim.new(0, 10)
+sfPadding.PaddingBottom = UDim.new(0, 10)
+sfPadding.PaddingLeft = UDim.new(0, 10)
+sfPadding.PaddingRight = UDim.new(0, 10)
+sfPadding.Parent = scrollFrame
+
+local sfLayout = Instance.new("UIListLayout")
+sfLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sfLayout.Padding = UDim.new(0, 10)
+sfLayout.Parent = scrollFrame
+
+-- Input area (bottom)
+local inputFrame = Instance.new("Frame")
+inputFrame.Size = UDim2.new(1, -20, 0, 75)
+inputFrame.Position = UDim2.new(0, 10, 1, -85)
+inputFrame.BackgroundColor3 = Color3.fromRGB(28, 26, 38)
+inputFrame.BorderSizePixel = 0
+inputFrame.Parent = chatWindow
+
+local ifCorner = Instance.new("UICorner")
+ifCorner.CornerRadius = UDim.new(0, 10)
+ifCorner.Parent = inputFrame
+
+local inputBox = Instance.new("TextBox")
+inputBox.Size = UDim2.new(1, -85, 0, 48)
+inputBox.Position = UDim2.new(0, 12, 0.5, -24)
+inputBox.BackgroundColor3 = Color3.fromRGB(45, 42, 58)
+inputBox.PlaceholderText = "Kuch likho yaar... 💬"
+inputBox.PlaceholderColor3 = Color3.fromRGB(160, 160, 180)
+inputBox.Text = ""
+inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+inputBox.TextSize = 16
+inputBox.Font = Enum.Font.Gotham
+inputBox.BorderSizePixel = 0
+inputBox.ClearTextOnFocus = false
+inputBox.TextXAlignment = Enum.TextXAlignment.Left
+inputBox.Parent = inputFrame
+
+local ibCorner = Instance.new("UICorner")
+ibCorner.CornerRadius = UDim.new(0, 8)
+ibCorner.Parent = inputBox
+
+local ibPadding = Instance.new("UIPadding")
+ibPadding.PaddingLeft = UDim.new(0, 12)
+ibPadding.PaddingRight = UDim.new(0, 12)
+ibPadding.Parent = inputBox
+
+local sendBtn = Instance.new("TextButton")
+sendBtn.Size = UDim2.new(0, 60, 0, 48)
+sendBtn.Position = UDim2.new(1, -72, 0.5, -24)
+sendBtn.BackgroundColor3 = Color3.fromRGB(255, 105, 180)
+sendBtn.Text = "➤"
+sendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+sendBtn.TextSize = 24
+sendBtn.Font = Enum.Font.GothamBold
+sendBtn.BorderSizePixel = 0
+sendBtn.Parent = inputFrame
+
+local sbCorner = Instance.new("UICorner")
+sbCorner.CornerRadius = UDim.new(0, 8)
+sbCorner.Parent = sendBtn
+
+-- ============================================
+-- 💬 ADD MESSAGE
+-- ============================================
+local function addMessage(text, isPlayer)
+    local msgFrame = Instance.new("Frame")
+    msgFrame.Size = UDim2.new(0, 280, 0, 0)
+    msgFrame.AutomaticSize = Enum.AutomaticSize.Y
+    msgFrame.BackgroundColor3 = isPlayer and Color3.fromRGB(80, 150, 255) or Color3.fromRGB(60, 50, 75)
+    msgFrame.BorderSizePixel = 0
+    msgFrame.Parent = scrollFrame
+    
+    if isPlayer then
+        msgFrame.AnchorPoint = Vector2.new(1, 0)
+        msgFrame.Position = UDim2.new(1, 0, 0, 0)
+    end
+    
+    local mCorner = Instance.new("UICorner")
+    mCorner.CornerRadius = UDim.new(0, 12)
+    mCorner.Parent = msgFrame
+    
+    if not isPlayer then
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(255, 105, 180)
+        stroke.Thickness = 2
+        stroke.Transparency = 0.3
+        stroke.Parent = msgFrame
+    end
+    
+    local mPadding = Instance.new("UIPadding")
+    mPadding.PaddingTop = UDim.new(0, 10)
+    mPadding.PaddingBottom = UDim.new(0, 10)
+    mPadding.PaddingLeft = UDim.new(0, 14)
+    mPadding.PaddingRight = UDim.new(0, 14)
+    mPadding.Parent = msgFrame
+    
+    local msgLabel = Instance.new("TextLabel")
+    msgLabel.Size = UDim2.new(1, 0, 0, 0)
+    msgLabel.AutomaticSize = Enum.AutomaticSize.Y
+    msgLabel.BackgroundTransparency = 1
+    msgLabel.Text = text
+    msgLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    msgLabel.TextSize = 15
+    msgLabel.Font = Enum.Font.Gotham
+    msgLabel.TextWrapped = true
+    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+    msgLabel.TextYAlignment = Enum.TextYAlignment.Top
+    msgLabel.Parent = msgFrame
+    
+    task.wait()
+    scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
 end
 
-local function showNotify(title, text, duration)
-	pcall(function()
-		Rayfield:Notify({
-			Title = title,
-			Content = text,
-			Duration = duration or 3,
-		})
-	end)
+-- ============================================
+-- 🕐 TYPING
+-- ============================================
+local typingFrame = nil
+
+local function showTyping()
+    if typingFrame then typingFrame:Destroy() end
+    typingFrame = Instance.new("Frame")
+    typingFrame.Size = UDim2.new(0, 110, 0, 38)
+    typingFrame.BackgroundColor3 = Color3.fromRGB(60, 50, 75)
+    typingFrame.BorderSizePixel = 0
+    typingFrame.Parent = scrollFrame
+    
+    local tCorner = Instance.new("UICorner")
+    tCorner.CornerRadius = UDim.new(0, 12)
+    tCorner.Parent = typingFrame
+    
+    local tLabel = Instance.new("TextLabel")
+    tLabel.Size = UDim2.new(1, 0, 1, 0)
+    tLabel.BackgroundTransparency = 1
+    tLabel.Text = "Aria typing..."
+    tLabel.TextColor3 = Color3.fromRGB(255, 180, 220)
+    tLabel.TextSize = 14
+    tLabel.Font = Enum.Font.Gotham
+    tLabel.Parent = typingFrame
+    
+    task.wait()
+    scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
 end
 
-local Window = Rayfield:CreateWindow({
-	Name = "⚡ ｏｂｉ  ＳＰＡＭＭＥＲ VVIP ⚡",
-	LoadingTitle = "ｏｂｉ ＳＰＡＭＭＥＲ",
-	LoadingSubtitle = "by UBAID",
-	ConfigurationSaving = { Enabled = false }
-})
+local function hideTyping()
+    if typingFrame then
+        typingFrame:Destroy()
+        typingFrame = nil
+    end
+end
 
-local Tab = Window:CreateTab("Main Controls", 4483345998)
+-- ============================================
+-- 🚀 SEND
+-- ============================================
+local isProcessing = false
 
-Tab:CreateLabel("✨ ｏｂｉ ＳＰＡＭＭＥＲ ＳＹＳＴＥＭ ✨")
-Tab:CreateLabel("👑 MAIN OWNER: UBAID_705")
-Tab:CreateLabel("🔥 CREATOR: UBAID")
+local function sendMessage()
+    if isProcessing then return end
+    local text = inputBox.Text
+    if text == "" or #text < 1 then return end
+    
+    addMessage(text, true)
+    inputBox.Text = ""
+    showTyping()
+    isProcessing = true
+    
+    task.spawn(function()
+        local reply = getAIResponse(text)
+        hideTyping()
+        addMessage(reply, false)
+        isProcessing = false
+    end)
+end
 
-Tab:CreateInput({
-	Name = "HATER 1 Name",
-	PlaceholderText = "Enter Name",
-	RemoveTextAfterFocusLost = false,
-	Callback = function(Value) haterList[1] = Value ~= "" and Value or "HATER 1" end,
-})
+sendBtn.MouseButton1Click:Connect(sendMessage)
+inputBox.FocusLost:Connect(function(enter) 
+    if enter then sendMessage() end 
+end)
 
-Tab:CreateInput({
-	Name = "HATER 2 Name",
-	PlaceholderText = "Enter Name",
-	RemoveTextAfterFocusLost = false,
-	Callback = function(Value) haterList[2] = Value ~= "" and Value or "HATER 2" end,
-})
+-- ============================================
+-- 🎯 MINIMIZE / RESTORE
+-- ============================================
+local function minimizeChat()
+    chatWindow.Visible = false
+    chatButton.Visible = true
+end
 
-Tab:CreateInput({
-	Name = "HATER 3 Name",
-	PlaceholderText = "Enter Name",
-	RemoveTextAfterFocusLost = false,
-	Callback = function(Value) haterList[3] = Value ~= "" and Value or "HATER 3" end,
-})
+local function openChat()
+    chatWindow.Visible = true
+    chatButton.Visible = false
+    task.wait(0.1)
+    inputBox:CaptureFocus()
+end
 
-Tab:CreateInput({
-	Name = "HATER 4 Name",
-	PlaceholderText = "Enter Name",
-	RemoveTextAfterFocusLost = false,
-	Callback = function(Value) haterList[4] = Value ~= "" and Value or "HATER 4" end,
-})
+closeBtn.MouseButton1Click:Connect(minimizeChat)
+chatButton.MouseButton1Click:Connect(openChat)
 
-Tab:CreateSlider({
-	Name = "Speed Slider (Seconds)",
-	Range = {0.01, 2.0},
-	Increment = 0.01,
-	Suffix = "sec",
-	CurrentValue = 0.8,
-	Flag = "SpeedSlider",
-	Callback = function(Value) speed = Value end,
-})
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.E then
+        if not chatWindow.Visible then openChat() end
+    end
+end)
 
-Tab:CreateToggle({
-	Name = "START / STOP SPAMMER",
-	CurrentValue = false,
-	Flag = "SpammerToggle",
-	Callback = function(Value)
-		running = Value
-		generation = generation + 1
-		local currentGeneration = generation
-		messageCount = 0
-		borderMode = 1
+-- ============================================
+-- 👋 WELCOME
+-- ============================================
+task.wait(0.5)
+addMessage("Hii yaar! 💕 Main Aria hoon. Kuch bhi pucho, baat karo mujhse 😊", false)
 
-		if not running then
-			showNotify("⚡ OBI SPAMMER", "STATUS: STOPPED", 2)
-			return
-		end
-
-		showNotify("⚡ OBI SPAMMER", "STATUS: RUNNING 🔥", 2)
-
-		task.spawn(function()
-			while running and currentGeneration == generation do
-				local msg = buildFinalMsg()
-				sendChatMessage(msg)
-
-				messageCount = messageCount + 1
-
-				if messageCount >= 8 then
-					messageCount = 0
-					borderMode = (borderMode % 4) + 1
-					task.wait(1.5)
-				else
-					task.wait(speed)
-				end
-			end
-		end)
-	end,
-})
-
-Tab:CreateButton({
-	Name = "Preview Message",
-	Callback = function() showNotify("⚡ PREVIEW", buildFinalMsg(), 4) end,
-})
+print("═══════════════════════════════════════")
+print("✅ AI CHAT ARIA READY! 💕")
+print("💬 'E' key ya 💬 button dabao")
+print("═══════════════════════════════════════")
